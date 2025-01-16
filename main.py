@@ -17,7 +17,7 @@ def telegram_sendfile(file_path, message, token, chat_id):
 def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
     key = paramiko.Ed25519Key.from_private_key_file(ssh_private_key_file)
     sites = []
-
+    
     for server in server_list:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -43,11 +43,48 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
             sites_uniq.append(site)
     return sites_uniq
 
+def check_sites(sites_list, file_path):
+    status = []
+    for site in sites_list:
+        sitename = site['domain']
+        server = site['server']
+        try:
+            r = requests.get('https://' + sitename, timeout=20)
+            if r.status_code != 200:
+                state = f"HTTP code: {r.status_code}"
+                # responce time
+                responce_time = r.elapsed.total_seconds()
+                status_code = r.status_code
+                failed = True
+            else:
+                state = "OK"
+                # responce time
+                responce_time = r.elapsed.total_seconds()
+                status_code = r.status_code
+                failed = False
+        except requests.exceptions.RequestException as e:
+            state = f"Error: {e}"
+            responce_time = 0
+            status_code = 0
+            failed = True
+        
+        except Exception as e:
+            state = f"Error: {e}"
+            responce_time = 0
+            status_code = 0
+            failed = True
+        
+        current_status = {"domain": sitename, "state": state, "status_code": status_code, "server": server, "responce_time": responce_time, "failed": failed}
+        print(current_status)
+        status.append(current_status)
+    with open(file_path, "w") as f:
+        json.dump(status, f)
+        
+
+
 
 server_list = os.getenv("SERVER_LIST").strip("[]").replace("'", "").split(",")
 server_list = [server.strip() for server in server_list]
 sites = get_sites_list(server_list, os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
-with open("sites.json", "w") as f:
-    json.dump(sites, f)
-
+check_sites(sites, os.getenv("RESULT_FILE_PATH"))
 
