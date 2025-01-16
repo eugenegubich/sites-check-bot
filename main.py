@@ -13,9 +13,9 @@ def telegram_sendfile(file_path, message, token, chat_id):
     resp = requests.post(url, files=files, data=data)
     return resp.json()
 
-def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port): # Get the list of sites from the server and return json
+def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
+    key = paramiko.Ed25519Key.from_private_key_file(ssh_private_key_file)
     sites = {}
-    key = paramiko.RSAKey.from_private_key_file(ssh_private_key_file)
 
     for server in server_list:
         ssh = paramiko.SSHClient()
@@ -37,8 +37,7 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port): # Get
         ssh.close()
     return sites
 
-def main():
-    get_sites_list(os.getenv("SERVER_LIST"), os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
+print(get_sites_list(os.getenv("SERVER_LIST"), os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT")))
 
 
 
