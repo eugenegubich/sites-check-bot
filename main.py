@@ -37,5 +37,8 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port): # Get
         ssh.close()
     return sites
 
+def main():
+    get_sites_list(os.getenv("SERVER_LIST"), os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
+
 
 
