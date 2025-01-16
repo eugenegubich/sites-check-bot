@@ -103,8 +103,10 @@ def count_server_errors(requests_status):
             for server_status in servers_status:
                 if server_status['server'] == server:
                     server_status['working_sites'] += 1
-    print(servers_status)
-    return servers_status
+    message = ""
+    for server in servers_status:
+        message += f"Server: {server['server']}\nErrors: {server['errors']}\nWorking sites: {server['working_sites']}\n\n"
+    return message
 
 
 
@@ -112,5 +114,7 @@ def count_server_errors(requests_status):
 server_list = os.getenv("SERVER_LIST").strip("[]").replace("'", "").split(",")
 server_list = [server.strip() for server in server_list]
 sites = get_sites_list(server_list, os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
-check_sites(sites, os.getenv("RESULT_FILE_PATH"))
+check_result = check_sites(sites, os.getenv("RESULT_FILE_PATH"))
+message = count_server_errors(check_result)
+
 
