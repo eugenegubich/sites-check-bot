@@ -21,9 +21,6 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
     for server in server_list:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        print(server)
-        print(ssh_port)
-        print(ssh_user)
         ssh.connect(server, port=ssh_port, username=ssh_user, pkey=key)
         stdin, stdout, stderr = ssh.exec_command("find /etc/nginx/sites-enabled/ -name '*.conf'")
         config_files = stdout.read().decode().strip().split("\n")
@@ -62,6 +59,16 @@ def check_sites(sites_list, file_path):
                 responce_time = r.elapsed.total_seconds()
                 status_code = r.status_code
                 failed = False
+        except requests.exceptions.Timeout:
+            state = "Timeout"
+            responce_time = 0
+            status_code = 0
+            failed = True
+        except requests.exceptions.ConnectionError:
+            state = "Connection Error"
+            responce_time = 0
+            status_code = 0
+            failed = True
         except requests.exceptions.RequestException as e:
             state = f"Error: {e}"
             responce_time = 0
