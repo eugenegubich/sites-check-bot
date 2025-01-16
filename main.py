@@ -21,16 +21,16 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port): # Get
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(server, port=ssh_port, username=ssh_user, pkey=key)
-        stdin, stdout, stderr = ssh.exec_command('find /etc/nginx/sites-enabled/ -name '*.conf'')
+        stdin, stdout, stderr = ssh.exec_command("find /etc/nginx/sites-enabled/ -name '*.conf'")
         config_files = stdout.read().decode().strip().split("\n")
         for config in config_files:
             stdin, stdout, stderr = ssh.exec_command(f'cat {config}')
             config_content = stdout.read().decode()
             matches = re.findall(r"server_name\s+([^\;]+);", config_content)
-                for match in matches:
-                    domains = match.split()
-                    domains = [domain.lstrip("www.") for domain in domains]
-                    server_domains.extend(domains)
+            for match in matches:
+                domains = match.split()
+                domains = [domain.lstrip("www.") for domain in domains]
+                server_domains.extend(domains)
 
         sites[server] = list(set(server_domains))
 
