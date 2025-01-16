@@ -3,6 +3,7 @@ import dotenv
 import os
 import paramiko
 import json
+import re
 
 dotenv.load_dotenv()
 
@@ -15,11 +16,14 @@ def telegram_sendfile(file_path, message, token, chat_id):
 
 def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
     key = paramiko.Ed25519Key.from_private_key_file(ssh_private_key_file)
-    sites = {}
+    sites = []
 
     for server in server_list:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        print(server)
+        print(ssh_port)
+        print(ssh_user)
         ssh.connect(server, port=ssh_port, username=ssh_user, pkey=key)
         stdin, stdout, stderr = ssh.exec_command("find /etc/nginx/sites-enabled/ -name '*.conf'")
         config_files = stdout.read().decode().strip().split("\n")
@@ -30,14 +34,20 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
             for match in matches:
                 domains = match.split()
                 domains = [domain.lstrip("www.") for domain in domains]
-                server_domains.extend(domains)
-
-        sites[server] = list(set(server_domains))
-
+                curritem = {'domain': domains[0], 'server': server}
+                sites.append(curritem)
         ssh.close()
-    return sites
+    sites_uniq = []
+    for site in sites:
+        if site not in sites_uniq:
+            sites_uniq.append(site)
+    return sites_uniq
 
-print(get_sites_list(os.getenv("SERVER_LIST"), os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT")))
 
+server_list = os.getenv("SERVER_LIST").strip("[]").replace("'", "").split(",")
+server_list = [server.strip() for server in server_list]
+sites = get_sites_list(server_list, os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
+with open("sites.json", "w") as f:
+    json.dump(sites, f)
 
 
