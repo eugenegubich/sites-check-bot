@@ -86,7 +86,26 @@ def check_sites(sites_list, file_path):
         status.append(current_status)
     with open(file_path, "w") as f:
         json.dump(status, f)
+    return status
+
         
+def count_server_errors(requests_status):
+    servers_status = []
+    for site in requests_status:
+        server = site['server']
+        if not any(server in d['server'] for d in servers_status):
+            servers_status.append({'server': server, 'errors': 0, 'working_sites': 0})
+        if site['failed']:
+            for server_status in servers_status:
+                if server_status['server'] == server:
+                    server_status['errors'] += 1
+        else:
+            for server_status in servers_status:
+                if server_status['server'] == server:
+                    server_status['working_sites'] += 1
+    print(servers_status)
+    return servers_status
+
 
 
 
