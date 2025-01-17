@@ -82,7 +82,6 @@ def check_sites(sites_list, file_path):
             failed = True
         
         current_status = {"domain": sitename, "state": state, "status_code": status_code, "server": server, "responce_time": responce_time, "failed": failed}
-        print(current_status)
         status.append(current_status)
     with open(file_path, "w") as f:
         json.dump(status, f)
@@ -116,5 +115,5 @@ server_list = [server.strip() for server in server_list]
 sites = get_sites_list(server_list, os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
 check_result = check_sites(sites, os.getenv("RESULT_FILE_PATH"))
 message = count_server_errors(check_result)
-
+print(message)
 
