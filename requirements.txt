@@ -3,3 +3,4 @@ python-dotenv
 Requests
 asyncio
 aiohttp
+io

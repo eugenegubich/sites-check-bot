@@ -6,12 +6,14 @@ import json
 import re
 import aiohttp
 import asyncio
+import datetime
+from io import BytesIO
 
 dotenv.load_dotenv()
 
-def telegram_sendfile(file_path, message, token, chat_id):
+def telegram_sendfile(file, message, token, chat_id):
     url = f"https://api.telegram.org/bot{token}/sendDocument"
-    files = {'document': open(file_path, 'rb')}
+    files = {'document': file}
     data = {"chat_id": chat_id, "caption": message}
     resp = requests.post(url, files=files, data=data)
     return resp.json()
@@ -65,14 +67,12 @@ async def fetch_status(session, site, semaphore):
         except Exception as e:
             return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
 
-async def check_sites_async(sites_list, file_path, max_concurrent_requests=100):
+async def check_sites_async(sites_list, max_concurrent_requests=100):
     status = []
     semaphore = asyncio.Semaphore(max_concurrent_requests)
     async with aiohttp.ClientSession() as session:
         tasks = [fetch_status(session, site, semaphore) for site in sites_list]
         status = await asyncio.gather(*tasks)
-    with open(file_path, "w") as f:
-        json.dump(status, f)
     return status
 
         
@@ -101,7 +101,10 @@ def count_server_errors(requests_status):
 server_list = os.getenv("SERVER_LIST").strip("[]").replace("'", "").split(",")
 server_list = [server.strip() for server in server_list]
 sites = get_sites_list(server_list, os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
-check_result = asyncio.run(check_sites_async(sites, os.getenv("RESULT_FILE_PATH"), int(os.getenv("PARRALLEL"))))
+check_result = asyncio.run(check_sites_async(sites, int(os.getenv("PARRALLEL"))))
+file_obj = BytesIO(json.dumps(check_result, indent=4).encode())
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+file_obj.name = f'{os.getenv("RESULT_FILE_PREFIX")}_{timestamp}.json'
 message = count_server_errors(check_result)
-print(message)
+telegram_sendfile(file_obj, message, os.getenv("TELEGRAM_API_KEY"), os.getenv("TELEGRAM_CHAT_ID"))
 
