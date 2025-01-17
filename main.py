@@ -4,6 +4,8 @@ import os
 import paramiko
 import json
 import re
+import aiohttp
+import asyncio
 
 dotenv.load_dotenv()
 
@@ -40,49 +42,35 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
             sites_uniq.append(site)
     return sites_uniq
 
-def check_sites(sites_list, file_path):
-    status = []
-    for site in sites_list:
-        sitename = site['domain']
-        server = site['server']
+async def fetch_status(session, site, semaphore):
+    sitename = site['domain']
+    server = site['server']
+    async with semaphore:
         try:
-            r = requests.get('https://' + sitename, timeout=20)
-            if r.status_code != 200:
-                state = f"HTTP code: {r.status_code}"
-                # responce time
-                responce_time = r.elapsed.total_seconds()
-                status_code = r.status_code
-                failed = True
-            else:
-                state = "OK"
-                # responce time
-                responce_time = r.elapsed.total_seconds()
-                status_code = r.status_code
-                failed = False
-        except requests.exceptions.Timeout:
-            state = "Timeout"
-            responce_time = 0
-            status_code = 0
-            failed = True
-        except requests.exceptions.ConnectionError:
-            state = "Connection Error"
-            responce_time = 0
-            status_code = 0
-            failed = True
-        except requests.exceptions.RequestException as e:
-            state = f"Error: {e}"
-            responce_time = 0
-            status_code = 0
-            failed = True
-        
+            async with session.get(f'https://{sitename}', timeout=20) as response:
+                responce_time = response.elapsed.total_seconds() if hasattr(response, 'elapsed') else 0
+                if response.status != 200:
+                    state = f"HTTP code: {response.status}"
+                    failed = True
+                else:
+                    state = "OK"
+                    failed = False
+                return {"domain": sitename, "state": state, "status_code": response.status, "server": server, "responce_time": responce_time, "failed": failed}
+        except asyncio.exceptions.TimeoutError:
+            return {"domain": sitename, "state": "Timeout", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+        except aiohttp.ClientConnectionError:
+            return {"domain": sitename, "state": "Connection Error", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+        except aiohttp.ClientError as e:
+            return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
         except Exception as e:
-            state = f"Error: {e}"
-            responce_time = 0
-            status_code = 0
-            failed = True
-        
-        current_status = {"domain": sitename, "state": state, "status_code": status_code, "server": server, "responce_time": responce_time, "failed": failed}
-        status.append(current_status)
+            return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+
+async def check_sites_async(sites_list, file_path, max_concurrent_requests=100):
+    status = []
+    semaphore = asyncio.Semaphore(max_concurrent_requests)
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_status(session, site, semaphore) for site in sites_list]
+        status = await asyncio.gather(*tasks)
     with open(file_path, "w") as f:
         json.dump(status, f)
     return status
@@ -113,7 +101,7 @@ def count_server_errors(requests_status):
 server_list = os.getenv("SERVER_LIST").strip("[]").replace("'", "").split(",")
 server_list = [server.strip() for server in server_list]
 sites = get_sites_list(server_list, os.getenv("SSH_PRIVATE_KEY_FILE"), os.getenv("SSH_USER"), os.getenv("SSH_PORT"))
-check_result = check_sites(sites, os.getenv("RESULT_FILE_PATH"))
+check_result = asyncio.run(check_sites_async(sites, os.getenv("RESULT_FILE_PATH"), int(os.getenv("PARRALLEL"))))
 message = count_server_errors(check_result)
 print(message)
 
