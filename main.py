@@ -44,34 +44,46 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
             sites_uniq.append(site)
     return sites_uniq
 
-async def fetch_status(session, site, semaphore):
+async def fetch_status(session, site, semaphore, retries):
     sitename = site['domain']
     server = site['server']
     async with semaphore:
-        try:
-            async with session.get(f'https://{sitename}', timeout=20) as response:
-                responce_time = response.elapsed.total_seconds() if hasattr(response, 'elapsed') else 0
-                if response.status != 200:
-                    state = f"HTTP code: {response.status}"
-                    failed = True
-                else:
-                    state = "OK"
-                    failed = False
-                return {"domain": sitename, "state": state, "status_code": response.status, "server": server, "responce_time": responce_time, "failed": failed}
-        except asyncio.exceptions.TimeoutError:
-            return {"domain": sitename, "state": "Timeout", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
-        except aiohttp.ClientConnectionError:
-            return {"domain": sitename, "state": "Connection Error", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
-        except aiohttp.ClientError as e:
-            return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
-        except Exception as e:
-            return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+        attempts = 0
+        while attempts < retries:
+            try:
+                async with session.get(f'https://{sitename}', timeout=20) as response:
+                    responce_time = response.elapsed.total_seconds() if hasattr(response, 'elapsed') else 0
+                    if response.status != 200: 
+                        attempts += 1
+                        if attempts >= retries:
+                            state = f"HTTP code: {response.status}"
+                            failed = True
+                    else:
+                        state = "OK"
+                        failed = False
+                    return {"domain": sitename, "state": state, "status_code": response.status, "server": server, "responce_time": responce_time, "failed": failed}
+            except asyncio.exceptions.TimeoutError:
+                attempts += 1
+                if attempts >= retries:
+                    return {"domain": sitename, "state": "Timeout", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+            except aiohttp.ClientConnectionError:
+                attempts += 1
+                if attempts >= retries:
+                    return {"domain": sitename, "state": "Connection Error", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+            except aiohttp.ClientError as e:
+                attempts += 1
+                if attempts >= retries:
+                    return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
+            except Exception as e:
+                attempts += 1
+                if attempts >= retries:
+                    return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
 
 async def check_sites_async(sites_list, max_concurrent_requests=100):
     status = []
     semaphore = asyncio.Semaphore(max_concurrent_requests)
     async with aiohttp.ClientSession() as session:
-        tasks = [fetch_status(session, site, semaphore) for site in sites_list]
+        tasks = [fetch_status(session, site, semaphore, int(os.getenv("RETRIES"))) for site in sites_list]
         status = await asyncio.gather(*tasks)
     return status
 
