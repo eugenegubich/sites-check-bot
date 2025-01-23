@@ -59,7 +59,7 @@ async def fetch_status(session, site, semaphore, retries):
                             state = f"HTTP code: {response.status}"
                             failed = True
                         else:
-                            asyncio.sleep(3)
+                            await asyncio.sleep(3)
                     else:
                         state = "OK"
                         failed = False
@@ -69,25 +69,25 @@ async def fetch_status(session, site, semaphore, retries):
                 if attempts >= retries:
                     return {"domain": sitename, "state": "Timeout", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
                 else:
-                    asyncio.sleep(3)
+                    await asyncio.sleep(3)
             except aiohttp.ClientConnectionError:
                 attempts += 1
                 if attempts >= retries:
                     return {"domain": sitename, "state": "Connection Error", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
                 else:
-                    asyncio.sleep(3)
+                    await asyncio.sleep(3)
             except aiohttp.ClientError as e:
                 attempts += 1
                 if attempts >= retries:
                     return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
                 else:
-                    asyncio.sleep(3)
+                    await asyncio.sleep(3)
             except Exception as e:
                 attempts += 1
                 if attempts >= retries:
                     return {"domain": sitename, "state": f"Error: {e}", "status_code": 0, "server": server, "responce_time": 0, "failed": True}
                 else:
-                    asyncio.sleep(3)
+                    await asyncio.sleep(3)
 
 async def check_sites_async(sites_list, max_concurrent_requests=100):
     status = []
