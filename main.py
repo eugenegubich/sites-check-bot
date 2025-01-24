@@ -34,7 +34,7 @@ def get_sites_list(server_list, ssh_private_key_file, ssh_user, ssh_port):
             matches = re.findall(r"server_name\s+([^\;]+);", config_content)
             for match in matches:
                 domains = match.split()
-                domains = [domain.lstrip("www.") for domain in domains]
+                domains = [domain.removeprefix("www.") for domain in domains]
                 curritem = {'domain': domains[0], 'server': server}
                 sites.append(curritem)
         ssh.close()
